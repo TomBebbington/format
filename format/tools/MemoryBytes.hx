@@ -1,13 +1,12 @@
 package format.tools;
 
 @:native('Int')
-extern class MemoryBytes {
-	
+abstract MemoryBytes(Int) from Int to Int {
 	public static inline function make( pos : Int ) : MemoryBytes {
 		return cast pos;
 	}
 	
-	inline function getPos() : Int {
+	@:to inline function getPos() : Int {
 		return cast this;
 	}
 	
