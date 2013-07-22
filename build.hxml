@@ -1,13 +1,5 @@
--neko tests/bc/test.n
--main Test
--cp tests/bc
--debug
--cmd neko tests/bc/test.n
--resource tests/bc/hello.bc@classfile
---next
--neko tests/class/test.n
+-neko tests/jar/test.n
 -main TestClass
--cp tests/class
--debug
--cmd neko tests/class/test.n
--resource tests/class/Test.class@classfile
+-cp tests/jar
+-dce full
+-cmd neko tests/jar/test.n

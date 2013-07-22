@@ -3,6 +3,11 @@ typedef Version = {
 	var minor:Int;
 	var major:Int;
 }
+typedef FieldInfo = {
+	var owner:String;
+	var name:String;
+	var type:String;
+}
 typedef Field = {
 	var accessFlags:Array<FieldAccessFlag>;
 	var nameIndex:Int;
@@ -60,12 +65,15 @@ enum Instruction {
 	Goto(b:Int);
 	IInc(i:Int, b:Int);
 	IfICmpGe(b:Int);
+	GetField(f:Int);
+	PutField(f:Int);
 	Dup;
 	GetStatic(r:Ref);
 	InvokeVirtual(m:Ref);
 	InvokeSpecial(ind:Int);
 	New(r:Ref);
 	Return;
+	ReturnRef;
 }
 enum Attribute {
 	Code(c:Code);
@@ -91,6 +99,7 @@ enum Constant {
 	NameAndType(n:Ref, t:Ref);
 	MethodHandle(k:Ref, r:Ref);
 	MethodType(r:Ref);
+	InvokeDynamic(mattr:Ref, nat:Ref);
 }
 enum ClassAccessFlag {
 	Public;

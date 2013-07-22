@@ -44,7 +44,8 @@ class Reader {
 			case 16: // method type
 				Constant.MethodType(i.readUInt16());
 			case 18: // invoke dynamic
-
+				var bootstrap = i.readUInt16();
+				Constant.InvokeDynamic(bootstrap, i.readUInt16());
 			default: throw 'Unknown tag byte ${StringTools.hex(bi)}';
 		}
 	}
@@ -171,8 +172,11 @@ class Reader {
 				case 0x84: var ind = i.readByte(); Instruction.IInc(ind, i.readByte());
 				case 0xA2: var a = i.readByte(); Instruction.IfICmpGe((a << 8) + i.readByte());
 				case 0xA7: var a = i.readByte(); Instruction.Goto((a << 8) + i.readByte());
+				case 0xB0: Instruction.ReturnRef;
 				case 0xB1: Instruction.Return;
-				case 0xB2: var a = i.readByte(); Instruction.GetStatic((a << 8) + i.readByte());
+				case 0xB2: var a = i.readByte(); Instruction.PutField((a << 8) + i.readByte());
+				case 0xB4: var a = i.readByte(); Instruction.GetField((a << 8) + i.readByte());
+				case 0xB5: var a = i.readByte(); Instruction.GetStatic((a << 8) + i.readByte());
 				case 0xB6: var a = i.readByte(); Instruction.InvokeVirtual((a << 8) + i.readByte());
 				case 0xB7: var a = i.readByte(); Instruction.InvokeSpecial((a << 8) + i.readByte());
 				case 0xBB: var a = i.readByte(); Instruction.New((a << 8) + i.readByte());
@@ -187,7 +191,6 @@ class Reader {
 			throw "Invalid magic number";
 		var minorv = i.readUInt16();
 		d.version = {minor: minorv, major: i.readUInt16()};
-		#if debug trace("Version: "+Tools.resolveVersion(d.version)); #end
 		var constCount = i.readUInt16() - 1;
 		d.constants = [for(i in 0...constCount) readConstant()];
 		d.constants.insert(0, null);
@@ -210,10 +213,8 @@ class Reader {
 			d.accessFlags.push(ClassAccessFlag.Annotation);
 		if(accessFlagsi & 0x4000 != 0)
 			d.accessFlags.push(ClassAccessFlag.Enum);
-		#if debug trace("Class access: "+d.accessFlags); #end
 		d.thisId = i.readUInt16();
 		d.superId = i.readUInt16();
-		#if debug trace(Tools.resolveConstant(d, d.thisId) + " extends " + Tools.resolveConstant(d, d.superId)); #end
 		d.interfaces = [for(_ in 0...i.readUInt16()) i.readUInt16()];
 		d.fields = [for(_ in 0...i.readUInt16()) {
 			var f:Dynamic = {};
@@ -231,7 +232,6 @@ class Reader {
 			f.nameIndex = i.readUInt16();
 			f.descriptorIndex = i.readUInt16();
 			f.attributes = [for(_ in 0...i.readUInt16()) readAttribute(d.constants)];
-			#if debug trace(Tools.resolveConstant(d, f.nameIndex)+" : "+Tools.resolveConstant(d, f.descriptorIndex)); #end
 			f;
 		}];
 		var fields:Array<Field> = d.fields;

@@ -1,6 +1,0 @@
--neko test_class.n
--main TestClass
--cp tests/class
--debug
--cmd neko test_class.n
--resource Test.class@classfile

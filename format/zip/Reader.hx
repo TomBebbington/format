@@ -25,7 +25,6 @@
  * DAMAGE.
  */
 package format.zip;
-
 #if haxe3
 
 typedef Reader = haxe.zip.Reader;

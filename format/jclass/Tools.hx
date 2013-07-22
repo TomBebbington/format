@@ -1,8 +1,10 @@
 package format.jclass;
 import haxe.macro.Type;
 import haxe.macro.Expr;
+import haxe.macro.*;
 import format.jclass.Data;
-
+using StringTools;
+using Lambda;
 class Tools {
 	public static function resolveField(cl:JClass, f:Field) {
 		var name = resolveConstant(cl, f.nameIndex);
@@ -24,6 +26,7 @@ class Tools {
 	}
 	static function toTypePath(cp:String):TypePath {
 		var parts = cp.split("/");
+		#if !java if(parts[0] == "java") parts[0] = "jax"; #end
 		return {
 			params: [],
 			pack: parts.slice(0, parts.length-1),
@@ -50,7 +53,7 @@ class Tools {
 	public static function resolveType(cl:JClass, i:Int):ComplexType {
 		return resolveTypeString(resolveConstant(cl, i));
 	}
-	public static function toHaxeField(cl:JClass, f:Field):haxe.macro.Expr.Field {
+	public static function toHaxeField(cl:JClass, f:Field):Expr.Field {
 		var fv:Expr = null;
 		for(a in f.attributes)
 			switch(a) {
@@ -66,7 +69,7 @@ class Tools {
 				default:
 			}
 		return {
-			pos: null,
+			pos: Tools.pos(),
 			name: resolveConstant(cl, f.nameIndex),
 			kind: FieldType.FVar(resolveType(cl, f.descriptorIndex), fv),
 			access: accesses
@@ -75,85 +78,92 @@ class Tools {
 	static function toExprField(s:String):Expr {
 		var fieldName = s.substr(s.lastIndexOf(".")+1);
 		var rest = s.substr(0, s.lastIndexOf("."));
-		var first:Expr = rest.indexOf(".") != -1 ? toExprField(rest) : {expr: EConst(CIdent(rest)), pos: null};
+		var first:Expr = rest.indexOf(".") != -1 ? toExprField(rest) : {expr:  EConst(CIdent(rest)), pos: Tools.pos()};
 		return macro $first.$fieldName;
 	}
 	static function makeVar(b:Array<Expr>, s:Array<Expr>, e:Expr, ?t:ComplexType):Void {
 		var n = 's${s.length}';
-		if(t != null && haxe.macro.ComplexTypeTools.toString(t) == "Void")
+		if(t != null && ComplexTypeTools.toString(t) == "Void")
 			b.push(e);
 		else {
-			s.push({expr: EConst(CIdent(n)), pos: null});
+			s.push({expr:  EConst(CIdent(n)), pos: Tools.pos()});
 			b.push(macro var $n:$t = $e);
+		}
+	}
+	static function getId(e:Expr):String {
+		return switch(e.expr) {
+			case EConst(CIdent(s)): s;
+			default: throw "Not an identifier";
 		}
 	}
 	static function toExpr(cl:JClass, ins:Array<Instruction>, ?stack:Array<Expr>, isConst=false):Expr {
 		if(stack == null) stack = [];
 		var block:Array<Expr> = [];
 		for(i in ins) {
-			trace(i);
+			#if debug trace(i+", Stack: "+[for(s in stack) ExprTools.toString(s)].join(", ")); #end
 			switch(i) {
-				case IALoad, LALoad, FALoad, DALoad, AALoad, BALoad, CALoad, SALoad: var ind = stack.pop(); var arr = stack.pop(); makeVar(block, stack, macro $arr[$ind]);
-				case IConst(v): makeVar(block, stack, {expr: EConst(CInt(Std.string(v))), pos: null});
-				case ALoad(i): makeVar(block, stack, {expr: EConst(CIdent("l"+i)), pos: null}); null;
-				case IStore(i): var vname = 'v${i}'; macro $i{vname} = ${stack.pop()};
-				case ILoad(i): stack.push(macro $i{'v${i}'});
-				case BiPush(v): stack.push({expr: EConst(CInt(Std.string(v))), pos: null});
-				case IfICmpGe(b): trace(b + ": "+ins.slice(b)+"/"+ins.length);
-				case IInc(i, b): var name = 'v{i}', val:Expr = {expr: EConst(CInt(Std.string(i))), pos: null}; macro poo += $val;
-				case InvokeSpecial(ind):
-					var desc:String = resolveConstant(cl, ind);
-					if(desc.indexOf("method ")==0)
-						desc = desc.substr(7);
-					var mtype:Array<String> = desc.split(":");
-					var mname = mtype[1], type = resolveTypeString(mtype[2]), cls = mtype[0];
-					if(mname == "<init>") {
-						var clr:Array<String> = cls.split("/");
-						var name:String = clr.pop();
-						var typ:TypePath = {sub: null, params: [], pack: clr, name: name};
-						makeVar(block, stack, {expr: ENew(typ, []), pos: null}, TPath(typ));
-					} else {
-						trace(stack.map(haxe.macro.ExprTools.toString));
-						throw('Name: $mname, type: $type, class: $cls');
+				case IALoad | FALoad:
+					var ind = stack.pop();
+					var arr = stack.pop();
+					makeVar(block, stack, macro $arr[$ind]);
+				case AStore(i) | IStore(i): var name = 'l${i}'; block.push(macro var $name = ${stack.pop()});
+				case ALoad(i) | ILoad(i): stack.push(macro $i{'l${i}'});
+				case IConst(v): stack.push({expr:  EConst(CInt(Std.string(v))), pos: Tools.pos()});
+				case BiPush(v): stack.push({expr:  EConst(CInt(Std.string(v))), pos: Tools.pos()});
+				case Dup: stack.push(stack[stack.length-1]);
+				case Ldc(r): stack.push(constantExpr(cl, r));
+				case InvokeSpecial(i) if(resolveConstant(cl, i).name == "<init>" && block.length == 0):
+					var objId = getId(stack.pop());
+					var m:FieldInfo = resolveConstant(cl, i);
+					var argsLen:Int = switch(Tools.resolveTypeString(m.type)) {
+						case ComplexType.TFunction(args, _): args.length;
+						default: 0;
 					}
-				case GetStatic(r): switch(cl.constants[r]) {
-					case FieldRef(c, nt):
-						var c:String = resolveConstant(cl, c).split("/").join(".");
-						var nt:String = resolveConstant(cl, nt);
-						var type = resolveTypeString(nt.split(":").pop());
-						var f = nt.split(":")[0];
-						makeVar(block, stack, toExprField('$c.$f'), type);
-					default:
-				};
-				case InvokeVirtual(m):
-					var obj = stack[stack.length-2];
-					var method:String = resolveConstant(cl, m);
-					var mdesc:Array<String> = method.split(":");
-					var mtype:ComplexType = resolveTypeString(mdesc.pop());
-					var nargs = 0;
-					var retType:ComplexType = switch(mtype) {
-						case TFunction(args, ret):nargs = args.length; ret;
-						default: null;
+					var args:Array<Expr> = [for(i in 0...argsLen) stack.pop()];
+					block.push({expr: ECall(macro super, args), pos: pos()});
+				case InvokeSpecial(i) if(resolveConstant(cl, i).name == "<init>"):
+					var objId = getId(stack.pop());
+					var m:FieldInfo = resolveConstant(cl, i);
+					var argsLen:Int = switch(Tools.resolveTypeString(m.type)) {
+						case ComplexType.TFunction(args, _): args.length;
+						default: 0;
+					}
+					var args:Array<Expr> = [for(i in 0...argsLen) stack.pop()];
+					var newe:Expr = {expr: ENew(Tools.toTypePath(m.owner), args), pos: pos()};
+					block.push(macro $i{objId} = $newe);
+					stack.push(macro $i{objId});
+				case InvokeSpecial(i) | InvokeVirtual(i): 
+					var m:FieldInfo = resolveConstant(cl, i);
+					var name = m.name;
+					var t:ComplexType = Tools.resolveTypeString(m.type);
+					var ret:ComplexType = null;
+					var argsLen:Int = switch(t) {
+						case ComplexType.TFunction(args, rett): ret = rett; args.length;
+						default: 0;
 					};
-					var mname = mdesc[1];
-					var args:Array<Expr> = [for(i in 0...nargs) stack.pop()];
-					stack.pop();
-					makeVar(block, stack, {expr: ECall(macro $obj.$mname, args), pos: null}, retType);
-				case Ldc(i): makeVar(block, stack, constantExpr(cl,i));
-				case Return: macro return;
-				case New(r):
-					var clr:Array<String> = resolveConstant(cl, r).split("/");
-					var name:String = clr.pop();
-					var typ:TypePath = {sub: null, params: [], pack: clr, name: name};
-					//makeVar(block, stack, {expr: ENew(typ, []), pos: null});
-					makeVar(block, stack, macro null, TPath(typ));
-				case Dup: var t = stack.pop(); makeVar(block, stack, t); makeVar(block, stack, t);
+					var args:Array<Expr> = [for(i in 0...argsLen) stack.pop()];
+					var obj = stack.pop();
+					makeVar(block, stack, {expr: ECall(macro $obj.$name, args), pos: pos()}, ret);
+				case PutField(f):
+					var fi:FieldInfo = resolveConstant(cl, f);
+					var ftype = Tools.resolveTypeString(fi.type);
+					var field = fi.name;
+					var tpath = Tools.toTypePath(fi.owner);
+					var ownere:Expr = toExprField(ComplexTypeTools.toString(TPath(tpath)));
+					var expr = macro $ownere.$field;
+					makeVar(block, stack, expr, ftype);
+				case ReturnRef: var re = stack.pop(); block.push(macro return $re);
+				case Return: block.push(macro return);
+				case New(r): 
+					var po:String = resolveConstant(cl, r);
+					var t:ComplexType = TPath(Tools.toTypePath(po));
+					makeVar(block, stack, macro null, t);
 				default: throw 'Unrecognised instruction: $i';
 			};
 		}
-		return {expr: ExprDef.EBlock(block), pos: null};
+		return {expr:  ExprDef.EBlock(block), pos: Tools.pos()};
 	}
-	public static function toHaxeMethod(cl:JClass, m:Method):haxe.macro.Expr.Field {
+	public static function toHaxeMethod(cl:JClass, m:Method):Expr.Field {
 		var fv:Expr = null;
 		for(a in m.attributes)
 			switch(a) {
@@ -181,13 +191,26 @@ class Tools {
 				case Code(c): code = c;
 				default:
 			}
+		var c = resolveConstant(cl, m.nameIndex);
+		var name = c == "<init>" ? "new": c;
+		var thisIdent = "l" + args.length;
 		return {
-			pos: null,
-			name: {var c = resolveConstant(cl, m.nameIndex);c=="<init>"?"new":c;},
+			pos: Tools.pos(),
+			name: name,
 			kind: FieldType.FFun({
 				ret: ret,
 				params: [],
-				expr: code == null ? null : toExpr(cl, code.code),
+				expr: code == null ? null : {
+					var e:Expr = toExpr(cl, code.code);
+					if(!accesses.has(Access.AStatic) && name != "new") {
+						switch(e.expr) {
+							case EBlock(es):
+								es.insert(0, macro var $thisIdent = this);
+							default:
+						}
+					}
+					e;
+				},
 				args: [for(i in 0...args.length) {type: args[i], opt: false, name: 'l${i}'}]
 			}),
 			access: accesses
@@ -209,6 +232,34 @@ class Tools {
 			kind: TypeDefKind.TDClass(superClass)
 		};
 	}
+	#if macro
+	public static macro function build(path:String):Array<Expr.Field> {
+		if(!sys.FileSystem.exists(path))
+			throw '"$path" does not exist in "${Sys.getCwd()}"';
+		var cls:ClassType = Context.getLocalClass().get();
+		var inp = sys.io.File.read(path, true);
+		var cl:JClass = new Reader(inp).read();
+		var superPath = Tools.toTypePath(Tools.resolveConstant(cl, cl.superId));
+		var superClass = switch(Context.getType(ComplexTypeTools.toString(TPath(superPath)))) {
+			case TInst(t, ps):
+				{t: t, params: ps};
+			case all: throw 'Invalid superclass ${TypeTools.toString(all)}';
+		};
+		var fields = [for(f in cl.fields) toHaxeField(cl, f)].concat([for(m in cl.methods) toHaxeMethod(cl, m)]);
+		#if debug for(f in fields) trace(new Printer().printField(f)); #end
+		var localType = Context.getLocalType();
+		switch(localType) {
+			case TInst(ct, cps):
+				var g:ClassType = ct.get();
+				g.superClass = superClass;
+			default:
+		}
+		return fields;
+	}
+	#end
+	static inline function pos():Position {
+		return #if macro Context.currentPos() #else null #end;
+	}
 	public static function resolveConstant(cl:JClass, c:Int):Dynamic {
 		return switch(cl.constants[c]) {
 			case Str(s): s;
@@ -219,28 +270,39 @@ class Tools {
 			case Double(f): f;
 			case ClassRef(i): resolveConstant(cl, i);
 			case MethodRef(cr, ntr):
-				"method " + resolveConstant(cl, cr) + ":" + resolveConstant(cl, ntr);
+				var other = cast(resolveConstant(cl, ntr), String).split(":");
+				{
+					owner: resolveConstant(cl, cr),
+					name: other[0],
+					type: other[1]
+				}
 			case FieldRef(c, nt):
-				"field " + resolveConstant(cl, c) + ":" + resolveConstant(cl, nt);
+				var other = cast(resolveConstant(cl, nt), String).split(":");
+				{
+					owner: resolveConstant(cl, c),
+					name: other[0],
+					type: other[1]
+				};
 			case NameAndType(n, t):
 				resolveConstant(cl, n) + ":" + resolveConstant(cl, t);
-			default: trace(c); null;
+			default: throw 'Constant $c not found';
 		}
 	}
-	public static function constantExpr(cl:JClass, c:Int, ?p:haxe.macro.Expr.Position):Expr {
+	public static function constantExpr(cl:JClass, c:Int):Expr {
 		return switch(cl.constants[c]) {
-			case Str(s): {expr: EConst(CString(s)), pos: p};
-			case StrRef(i): constantExpr(cl, i, p);
-			case Int(i): {expr: EConst(CInt(Std.string(i))), pos: p};
-			case Float(f) | Double(f): {expr: EConst(CFloat(Std.string(f))), pos: p};
-			case Long(i): var a = {expr: EConst(CInt(Std.string(haxe.Int64.getHigh(i)))), pos: p}, b = {expr: EConst(CInt(Std.string(haxe.Int64.getLow(i)))), pos: p};macro haxe.Int64.make($a, $b);
+			case Str(s): {expr: EConst(CString(s)), pos: pos()};
+			case StrRef(i): constantExpr(cl, i);
+			case Int(i): {expr: EConst(CInt(Std.string(i))), pos: pos()};
+			case Float(f) | Double(f): {expr: EConst(CFloat(Std.string(f))), pos: pos()};
+			case Long(i): var a = {expr: EConst(CInt(Std.string(haxe.Int64.getHigh(i)))), pos: pos()}, b = {expr: EConst(CInt(Std.string(haxe.Int64.getLow(i)))), pos: pos()};macro haxe.Int64.make($a, $b);
 			case all: throw 'Cannot resolve constant $all';
 		}
 	}
 	public static function toString(c:JClass):String {
 		var name = resolveConstant(c, c.thisId);
 		var superName = resolveConstant(c, c.superId);
-		trace(c.interfaces);
-		return '$name extends $superName';//return ;
+		var fieldDetails:String = [for(m in c.methods) "\n\t"+[for(a in m.accessFlags) a.getName().toLowerCase()].join(" ")+" "+resolveConstant(c, m.nameIndex) + "\t:\t" + ComplexTypeTools.toString(Tools.resolveType(c, m.descriptorIndex))].join("");
+		var interfaceDetails:String = c.interfaces.length > 0 ? " implements "+[for(i in c.interfaces) resolveConstant(c, i)].join(", ") : "";
+		return '$name extends $superName${interfaceDetails}:$fieldDetails';//return ;
 	}
 }
