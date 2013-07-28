@@ -33,7 +33,7 @@ class Tools {
 				var name = e.fileName;
 				if(e.compressed)
 					uncompress(e);
-				try new format.jclass.Reader(new BytesInput(e.data)).read() catch(e:Dynamic) throw 'Could not read class $name';
+				try new format.jclass.Reader(new BytesInput(e.data)).read() catch(e:Dynamic) throw 'Could not read class $name due to $e';
 			}];
 	}
 	public static function toString(d:Data):String {

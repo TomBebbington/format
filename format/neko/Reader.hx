@@ -126,6 +126,8 @@ class Reader {
 				GlobalFloat(i.readUntil(0));
 			case 5:
 				GlobalDebug(readDebugInfos());
+			case 6:
+				GlobalVersion(i.readByte());
 			default:
 				error();
 			}

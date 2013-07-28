@@ -136,6 +136,7 @@ class VM {
 			module.gtable[i] = switch(m.globals[i]) {
 			case GlobalVar(_): VNull;
 			case GlobalFloat(v): VFloat(Std.parseFloat(v));
+			case GlobalVersion(v): VInt(v);
 			case GlobalString(s): VString(s);
 			case GlobalFunction(pos, nargs): VFunction(switch( nargs ) {
 				case 0: VFun0(function() {
@@ -567,7 +568,8 @@ class VM {
 				default: null;
 				}
 				if( acc == null ) error(pc, "+");
-// case OSub:
+				case OSub:
+					trace(stack.pop() +" - "+acc);
 // case OMult:
 // case ODiv:
 // case OMod:

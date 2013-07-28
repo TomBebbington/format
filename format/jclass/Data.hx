@@ -24,7 +24,7 @@ typedef TryCatch = {
 	var startPc:Int;
 	var endPc:Int;
 	var handlerPc:Int;
-	var catchType:Ref;
+	var catchType:ConstRef<Dynamic>;
 }
 typedef Code = {
 	var maxStack:Int;
@@ -34,15 +34,16 @@ typedef Code = {
 	var attributes:Array<Attribute>;
 }
 enum Instruction {
-	AConstNull; // 0x01
+	NOp;
+	AConstNull;
 	IConst(v:Int);
 	LConst(v:haxe.Int64);
 	FConst(v:Float);
 	DConst(v:Float);
 	BiPush(v:Int);
 	SiPush(v:Int);
-	Ldc(r:Ref);
-	Ldc2(r:Ref);
+	Ldc(r:ConstRef<Dynamic>);
+	Ldc2(r:ConstRef<Dynamic>);
 	ILoad(i:Int);
 	LLoad(i:Int);
 	FLoad(i:Int);
@@ -62,44 +63,104 @@ enum Instruction {
 	DStore(v:Int);
 	AStore(v:Int);
 	IAStore;
+	LAStore;
+	FAStore;
+	DAStore;
+	BAStore;
+	CAStore;
+	AAStore;
 	Goto(b:Int);
 	IInc(i:Int, b:Int);
+	IfICmpEq(b:Int);
+	IfICmpNe(b:Int);
 	IfICmpGe(b:Int);
+	IfICmpGt(b:Int);
+	IfICmpLe(b:Int);
+	IfICmpLt(b:Int);
+	IfEq(b:Int);
+	IfGe(b:Int);
+	IfGt(b:Int);
+	IfLe(b:Int);
+	IfNeq(b:Int);
 	GetField(f:Int);
 	PutField(f:Int);
+	ANewArray(t:ConstRef<String>);
+	NewArray(t:ConstRef<String>);
+	MultiANewArray(t:ConstRef<String>, dims:Int);
+	ArrayLen;
 	Dup;
-	GetStatic(r:Ref);
-	InvokeVirtual(m:Ref);
-	InvokeSpecial(ind:Int);
-	New(r:Ref);
+	DupX1;
+	DupX2;
+	Dup2;
+	Dup2X1;
+	Dup2X2;
+	Pop;
+	IOr;
+	IAdd;
+	INeg;
+	IReturn;
+	IDiv;
+	FAdd;
+	FMul;
+	FNeg;
+	FSub;
+	FCmpl;
+	FCmpg;
+	FDiv;
+	DDiv;
+	IAnd;
+	IRem;
+	IMul;
+	IShl;
+	LShl;
+	IShr;
+	LShr;
+	F2I;
+	I2C;
+	I2B;
+	I2F;
+	GetStatic(r:ConstRef<Dynamic>);
+	InvokeVirtual(m:ConstRef<Dynamic>);
+	InvokeSpecial(m:ConstRef<Dynamic>);
+	InvokeStatic(m:ConstRef<Dynamic>);
+	IfLt(b:Int);
+	New(r:ConstRef<String>);
 	Return;
 	ReturnRef;
 }
 enum Attribute {
 	Code(c:Code);
 	Exceptions;
-	ConstantValue(v:Ref);
+	ConstantValue(v:ConstRef<Dynamic>);
 	Synthetic;
 	InnerClasses;
 	SourceFile(s:String);
 	Unknown(name:String, bytes:haxe.io.Bytes);
 }
-typedef Ref = Int;
+typedef ConstRef<T> = Int;
+typedef NameAndTypeData = {
+	var name: String;
+	var type: String;
+}
+typedef MethodHandleData = {
+	var kind:Int;
+	var index:ConstRef<Dynamic>;
+}
 enum Constant {
-	Str(s:String);
+	Utf8(s:String);
 	Int(i:Int);
 	Long(i:haxe.Int64);
 	Float(f:Float);
 	Double(f:Float);
-	ClassRef(i:Ref);
-	StrRef(i:Ref);
-	FieldRef(c:Ref, nt:Ref);
-	MethodRef(c:Ref, nt:Ref);
-	InterfRef(c:Ref, nt:Ref);
-	NameAndType(n:Ref, t:Ref);
-	MethodHandle(k:Ref, r:Ref);
-	MethodType(r:Ref);
-	InvokeDynamic(mattr:Ref, nat:Ref);
+	ClassRef(i:ConstRef<String>);
+	StrRef(i:ConstRef<String>);
+	FieldRef(c:ConstRef<String>, nt:ConstRef<NameAndTypeData>);
+	MethodRef(c:ConstRef<String>, nt:ConstRef<NameAndTypeData>);
+	InterfRef(c:ConstRef<String>, nt:ConstRef<NameAndTypeData>);
+	NameAndType(n:ConstRef<String>, t:ConstRef<String>);
+	MethodHandle(k:Int, r:ConstRef<Dynamic>);
+	MethodType(r:ConstRef<String>);
+	InvokeDynamic(mattr:Int, nat:ConstRef<NameAndTypeData>);
 }
 enum ClassAccessFlag {
 	Public;
@@ -141,8 +202,8 @@ typedef JClass = {
 	var constants:Array<Constant>;
 	var accessFlags:Array<ClassAccessFlag>;
 	var bitmask:Int;
-	var thisId:Ref;
-	var superId:Ref;
+	var thisId:ConstRef<String>;
+	var superId:ConstRef<String>;
 	var interfaces:Array<Int>;
 	var fields:Array<Field>;
 	var methods:Array<Method>;

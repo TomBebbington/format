@@ -104,6 +104,7 @@ enum Global {
 	GlobalString( v : String );
 	GlobalFloat( v : String );
 	GlobalDebug( debug : DebugInfos );
+	GlobalVersion(v:Int);
 }
 
 typedef Data = {

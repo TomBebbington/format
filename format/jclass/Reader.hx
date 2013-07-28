@@ -10,8 +10,8 @@ class Reader {
 	function readConstant():Constant {
 		var bi = i.readByte();
 		return switch(bi) {
-			case 1 | 2: // string
-				Constant.Str(i.readString(i.readUInt16()));
+			case 1: // utf8
+				Constant.Utf8(haxe.Utf8.decode(i.readString(i.readUInt16())));
 			case 3: // 32-bit int
 				Constant.Int(i.readInt32());
 			case 4: // 32-bit float
@@ -54,7 +54,7 @@ class Reader {
 		if(name == null) throw "Could not find attribute name";
 		var length = i.readInt32();
 		return switch(name) {
-			case Constant.Str(s):
+			case Constant.Utf8(s):
 				switch(s) {
 					case "Code":
 						var code:Dynamic = {};
@@ -89,6 +89,7 @@ class Reader {
 		var a:Array<Instruction> = [];
 		try while(true)
 			a.push(switch(i.readByte()) {
+				case 0x00: Instruction.NOp;
 				case 0x01: Instruction.AConstNull;
 				case 0x02: Instruction.IConst(-1);
 				case 0x03: Instruction.IConst(0);
@@ -168,18 +169,77 @@ class Reader {
 				case 0x4D: Instruction.AStore(2);
 				case 0x4E: Instruction.AStore(3);
 				case 0x4F: Instruction.IAStore;
+				case 0x50: Instruction.LAStore;
+				case 0x51: Instruction.FAStore;
+				case 0x52: Instruction.DAStore;
+				case 0x53: Instruction.AAStore;
+				case 0x54: Instruction.BAStore;
+				case 0x55: Instruction.CAStore;
+				case 0x57: Instruction.Pop;
 				case 0x59: Instruction.Dup;
+				case 0x5A: Instruction.DupX1;
+				case 0x5B: Instruction.DupX2;
+				case 0x5C: Instruction.Dup2;
+				case 0x5D: Instruction.Dup2X1;
+				case 0x5E: Instruction.Dup2X2;
+				case 0x60: Instruction.IAdd;
+				case 0x62: Instruction.FAdd;
+				case 0x64: Instruction.DDiv;
+				case 0x66: Instruction.FSub;
+				case 0x68: Instruction.IMul;
+				case 0x6A: Instruction.FMul;
+				case 0x6C: Instruction.IDiv;
+				case 0x6E: Instruction.FDiv;
+				case 0x70: Instruction.IRem;
+				case 0x74: Instruction.INeg;
+				case 0x76: Instruction.FNeg;
+				case 0x78: Instruction.IShl;
+				case 0x79: Instruction.LShl;
+				case 0x7A: Instruction.IShr;
+				case 0x7B: Instruction.LShr;
+				case 0x7E: Instruction.IAnd;
+				case 0x80: Instruction.IOr;
 				case 0x84: var ind = i.readByte(); Instruction.IInc(ind, i.readByte());
-				case 0xA2: var a = i.readByte(); Instruction.IfICmpGe((a << 8) + i.readByte());
-				case 0xA7: var a = i.readByte(); Instruction.Goto((a << 8) + i.readByte());
+				case 0x86: Instruction.I2F;
+				case 0x8B: Instruction.F2I;
+				case 0x91: Instruction.I2B;
+				case 0x92: Instruction.I2C;
+				case 0x95: Instruction.FCmpl;
+				case 0x96: Instruction.FCmpg;
+				case 0x99: var a = i.readByte(); Instruction.IfEq((a << 8) | i.readByte());
+				case 0x9A: var a = i.readByte(); Instruction.IfNeq((a << 8) | i.readByte());
+				case 0x9B: var a = i.readByte(); Instruction.IfLt((a << 8) | i.readByte());
+				case 0x9C: var a = i.readByte(); Instruction.IfGe((a << 8) | i.readByte());
+				case 0x9D: var a = i.readByte(); Instruction.IfGt((a << 8) | i.readByte());
+				case 0x9E: var a = i.readByte(); Instruction.IfLe((a << 8) | i.readByte());
+				case 0x9F: var a = i.readByte(); Instruction.IfICmpEq((a << 8) | i.readByte());
+				case 0xA0: var a = i.readByte(); Instruction.IfICmpNe((a << 8) | i.readByte());
+				case 0xA1: var a = i.readByte(); Instruction.IfICmpLt((a << 8) | i.readByte());
+				case 0xA2: var a = i.readByte(); Instruction.IfICmpGe((a << 8) | i.readByte());
+				case 0xA3: var a = i.readByte(); Instruction.IfICmpGt((a << 8) | i.readByte());
+				case 0xA4: var a = i.readByte(); Instruction.IfICmpLe((a << 8) | i.readByte());
+				case 0xA7: var a = i.readByte(); Instruction.Goto((a << 8) | i.readByte());
+				case 0xAC: Instruction.IReturn;
 				case 0xB0: Instruction.ReturnRef;
 				case 0xB1: Instruction.Return;
-				case 0xB2: var a = i.readByte(); Instruction.PutField((a << 8) + i.readByte());
-				case 0xB4: var a = i.readByte(); Instruction.GetField((a << 8) + i.readByte());
-				case 0xB5: var a = i.readByte(); Instruction.GetStatic((a << 8) + i.readByte());
-				case 0xB6: var a = i.readByte(); Instruction.InvokeVirtual((a << 8) + i.readByte());
-				case 0xB7: var a = i.readByte(); Instruction.InvokeSpecial((a << 8) + i.readByte());
-				case 0xBB: var a = i.readByte(); Instruction.New((a << 8) + i.readByte());
+				case 0xB2: var a = i.readByte(); Instruction.PutField((a << 8) | i.readByte());
+				case 0xB4: var a = i.readByte(); Instruction.GetField((a << 8) | i.readByte());
+				case 0xB5: var a = i.readByte(); Instruction.GetStatic((a << 8) | i.readByte());
+				case 0xB6: var a = i.readByte(); Instruction.InvokeVirtual((a << 8) | i.readByte());
+				case 0xB7: var a = i.readByte(); Instruction.InvokeSpecial((a << 8) | i.readByte());
+				case 0xB8: var a = i.readByte(); Instruction.InvokeStatic((a << 8) | i.readByte());
+				case 0xBB: var a = i.readByte(); Instruction.New((a << 8) | i.readByte());
+				case 0xBC: Instruction.NewArray(i.readByte());
+				case 0xBD: var a = i.readByte(); Instruction.ANewArray((a << 8) | i.readByte());
+				case 0xBE: Instruction.ArrayLen;
+				case 0xC4: //wide
+					var opcode = i.readByte();
+					switch(opcode) {
+						case 0x84:
+							var a = i.readByte(); Instruction.IInc((a << 8 | i.readByte()), i.readByte());
+						default: throw 'Unknown instruction: ${StringTools.hex(opcode, 2)}';
+					}
+				case 0xC5: var a = i.readByte(); var sti = (a << 8) | i.readByte(); Instruction.MultiANewArray(sti, i.readByte());
 				case all: throw 'Unknown Instruction: ${StringTools.hex(all, 2)}';
 			}) catch(e:Eof) {};
 		return a;

@@ -1,13 +1,11 @@
-import format.jar.*;
-import haxe.io.*;
-import format.tools.*;
+using sys.io.File;
+import format.jar.Reader;
+import format.jar.Tools;
 class TestClass {
 	public static function main() {
-		var args = new haxe.ds.Vector(1);
-		args[0] = "Hello, world!";
-		Test.main(cast args);
+		var bi = "tests/jar/test.jar".read(true);
+		var r = new Reader(bi);
+		var data = r.read();
+		Sys.println(Tools.toString(data));
 	}
-}
-@:build(format.jclass.Tools.build("tests/jar/Test.class")) class Test extends jax.lang.Object {
-
 }

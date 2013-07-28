@@ -1,5 +1,5 @@
--neko tests/jar/test.n
+-cp tests/jar/
 -main TestClass
--cp tests/jar
+-neko tests/jar/run.n
+-cmd neko tests/jar/run.n
 -dce full
--cmd neko tests/jar/test.n
