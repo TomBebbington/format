@@ -30,9 +30,7 @@ import format.neko.Data;
 import format.neko.Value;
 
 class VM {
-
-	// globals
-	var opcodes : Array<Opcode>;
+	var opcodes: Array<Opcode>;
 	var builtins : Builtins;
 	var hfields : Map<Int,String>;
 	var hbuiltins : Map<Int,Value>;
@@ -50,13 +48,11 @@ class VM {
 	public function new() {
 		hbuiltins = new Map();
 		hfields = new Map();
-		opcodes = [];
 		stack = new haxe.ds.GenericStack<Value>();
-		for( f in Type.getEnumConstructs(Opcode) )
-			opcodes.push(Type.createEnum(Opcode, f));
 		builtins = new Builtins(this);
-		for( b in builtins.table.keys() )
-			hbuiltins.set(hash(b), builtins.table.get(b));
+		hbuiltins = [for( b in builtins.table.keys() )
+			hash(b) => builtins.table.get(b)];
+		opcodes = [for( f in Type.getEnumConstructs(Opcode)) Type.createEnum(Opcode, f)];
 		hloader = hash("loader");
 		hexports = hash("exports");
 	}
@@ -80,51 +76,50 @@ class VM {
 
 	public function hashField( f : String ) {
 		var fid = hash(f);
-		var f2 = hfields.get(fid);
+		var f2 = hfields.exists(fid) ? hfields[fid] : throw 'Couldn\'t find hashed field $fid';
 		if( f2 != null ) {
 			if( f2 == f ) return fid;
 			throw "Hashing conflicts between '" + f + "' and '" + f2 + "'";
 		}
-		hfields.set(fid, f);
+		hfields[fid] = f;
 		return fid;
 	}
 
 	public function _abstract<T>( b : Value, t : Class<T> ) : T {
 		switch( b ) {
-		case VAbstract(v):
-			if( Std.is(v, t) )
-				return cast v;
-		default:
+			case VAbstract(v):
+				if( Std.is(v, t) )
+					return cast v;
+			default:
 		}
 		exc(VString("Invalid call"));
 		return null;
 	}
 
-	public function valueToString( v : Value ) {
+	public inline function valueToString( v : Value ) {
 		return builtins._string(v);
 	}
 
-	function exc( v : Value ) {
+	inline function exc( v : Value ) {
 		throw v;
 	}
 
 	function loadPrim( vprim : Value, vargs : Value ) {
 		var prim, nargs;
 		switch( vprim ) {
-		case VString(s): prim = s;
-		default: return null;
+			case VString(s): prim = s;
+			default: return null;
 		}
 		switch(vargs) {
-		case VInt(n): nargs = n;
-		default: return null;
+			case VInt(n): nargs = n;
+			default: return null;
 		}
-		var me = this;
-		return VFunction(VFunVar(function(_) { me.exc(VString("Failed to load primitive " + prim + ":" + nargs)); return null; } ));
+		return VFunction(VFunVar(function(_) { exc(VString("Failed to load primitive " + prim + ":" + nargs)); return null; } ));
 	}
 
 	public function defaultLoader() {
 		var loader = new ValueObject(null);
-		loader.fields.set(hash("loadprim"), VFunction(VFun2(loadPrim)));
+		loader.fields[hash("loadprim")] = VFunction(VFun2(loadPrim));
 		return loader;
 	}
 
@@ -409,6 +404,7 @@ class VM {
 				acc = module.gtable[code[pc++]];
 // case OAccEnv:
 			case OAccField:
+				var oacc = acc;
 				acc = getField(acc, code[pc]);
 				if( acc == null ) error(pc, "Invalid field access : " + fieldName(code[pc]));
 				pc++;

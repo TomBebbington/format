@@ -26,6 +26,7 @@
  */
 package format.zip;
 import format.zip.Data;
+import haxe.zip.Tools in OTools;
 
 class Tools {
 

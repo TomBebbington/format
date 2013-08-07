@@ -3,3 +3,4 @@
 -neko tests/jar/run.n
 -cmd neko tests/jar/run.n
 -dce full
+-debug

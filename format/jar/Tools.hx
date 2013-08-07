@@ -28,13 +28,19 @@ class Tools {
 		return getManifest(d)["Main-Class"];
 	}
 	public static function readClasses(d:Data):Array<JClass> {
-		return [for(e in d)
+		var classes = [];
+		for(e in d)
 			if(e.fileName.endsWith(".class")) {
 				var name = e.fileName;
 				if(e.compressed)
 					uncompress(e);
-				try new format.jclass.Reader(new BytesInput(e.data)).read() catch(e:Dynamic) throw 'Could not read class $name due to $e';
-			}];
+				#if debug trace('Reading class: ${e.fileName}'); #end
+				try
+					classes.push(new format.jclass.Reader(new BytesInput(e.data)).read())
+				catch(e:Dynamic)
+					trace('Could not read class $name due to $e');
+			}
+		return classes;
 	}
 	public static function toString(d:Data):String {
 		var m = Tools.getManifest(d);

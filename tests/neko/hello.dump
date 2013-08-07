@@ -1,0 +1,14 @@
+nglobals : 2
+nfields : 1
+codesize : 4 ops , 7 total
+GLOBALS =
+  global 0 : string "Hello, world!"
+  global 1 : debug 7 ops 18 bytes
+FIELDS =
+  print                   C88B582D
+CODE =
+000000      0    AccGlobal 0
+000002      1    Push
+000003      2    AccBuiltin print
+000005      3    Call 1
+END

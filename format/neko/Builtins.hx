@@ -37,11 +37,12 @@ class Builtins {
 	
 	public function new(vm) {
 		this.vm = vm;
-		table = new Map();
-		b("objsetproto", VFun2(objsetproto));
-		b("typeof", VFun1(typeof));
-		b("string", VFun1(string));
-		b("print", VFunVar(print));
+		table = [
+			"objsetproto" => VFunction(VFun2(objsetproto)),
+			"typeof" => VFunction(VFun1(typeof)),
+			"string" => VFunction(VFun1(string)),
+			"print" => VFunction(VFunVar(print))
+		];
 	}
 	
 	// -------- HELPERS ---------------------
@@ -52,108 +53,108 @@ class Builtins {
 	
 	public function _nargs( f : ValueFunction ) {
 		return switch( f ) {
-		case VFun0(_): 0;
-		case VFun1(_): 1;
-		case VFun2(_): 2;
-		case VFun3(_): 3;
-		case VFun4(_): 4;
-		case VFun5(_): 5;
-		case VFunVar(_): -1;
+			case VFun0(_): 0;
+			case VFun1(_): 1;
+			case VFun2(_): 2;
+			case VFun3(_): 3;
+			case VFun4(_): 4;
+			case VFun5(_): 5;
+			case VFunVar(_): -1;
 		}
 	}
 	
 	public function _compare( a : Value, b : Value ) : Int {
 		switch( a ) {
-		case VInt(a):
-			switch(b) {
-			case VInt(b):
-				return (a == b)?0:((a < b)? -1:1);
-			case VFloat(b):
-				return (a == b)?0:((a < b)? -1:1);
-			case VString(b):
-				var a = Std.string(a);
-				return (a == b)?0:((a < b)? -1:1);
+			case VInt(a):
+				switch(b) {
+					case VInt(b):
+						return (a == b)?0:((a < b)? -1:1);
+					case VFloat(b):
+						return (a == b)?0:((a < b)? -1:1);
+					case VString(b):
+						var a = Std.string(a);
+						return (a == b)?0:((a < b)? -1:1);
+				default:
+				}
+			case VFloat(a):
+				switch(b) {
+					case VInt(b):
+						return (a == b)?0:((a < b)? -1:1);
+					case VFloat(b):
+						return (a == b)?0:((a < b)? -1:1);
+					case VString(b):
+						var a = Std.string(a);
+						return (a == b)?0:((a < b)? -1:1);
+					default:
+				}
+			case VString(a):
+				switch(b) {
+					case VInt(b):
+						var b = Std.string(b);
+						return (a == b)?0:((a < b)? -1:1);
+					case VFloat(b):
+						var b = Std.string(b);
+						return (a == b)?0:((a < b)? -1:1);
+					case VString(b):
+						return (a == b)?0:((a < b)? -1:1);
+					case VBool(b):
+						var b = Std.string(b);
+						return (a == b)?0:((a < b)? -1:1);
+					default:
+				}
+			case VBool(a):
+				switch( b ) {
+					case VString(b):
+						var a = Std.string(a);
+						return (a == b)?0:((a < b)? -1:1);
+					case VBool(b):
+						return (a == b) ? 0 : (a ? 1 : -1);
+				default:
+				}
+			case VObject(a):
+				switch( b ) {
+				case VObject(b):
+						if( a == b )
+							return 0;
+						throw "TODO";
+					default:
+				}
+			case VProxy(a):
+				switch( b ) {
+					case VProxy(b):
+						return ( a == b ) ? 0 : CINVALID;
+					default:
+				}
 			default:
-			}
-		case VFloat(a):
-			switch(b) {
-			case VInt(b):
-				return (a == b)?0:((a < b)? -1:1);
-			case VFloat(b):
-				return (a == b)?0:((a < b)? -1:1);
-			case VString(b):
-				var a = Std.string(a);
-				return (a == b)?0:((a < b)? -1:1);
-			default:
-			}
-		case VString(a):
-			switch(b) {
-			case VInt(b):
-				var b = Std.string(b);
-				return (a == b)?0:((a < b)? -1:1);
-			case VFloat(b):
-				var b = Std.string(b);
-				return (a == b)?0:((a < b)? -1:1);
-			case VString(b):
-				return (a == b)?0:((a < b)? -1:1);
-			case VBool(b):
-				var b = Std.string(b);
-				return (a == b)?0:((a < b)? -1:1);
-			default:
-			}
-		case VBool(a):
-			switch( b ) {
-			case VString(b):
-				var a = Std.string(a);
-				return (a == b)?0:((a < b)? -1:1);
-			case VBool(b):
-				return (a == b) ? 0 : (a ? 1 : -1);
-			default:
-			}
-		case VObject(a):
-			switch( b ) {
-			case VObject(b):
-				if( a == b )
-					return 0;
-				throw "TODO";
-			default:
-			}
-		case VProxy(a):
-			switch( b ) {
-			case VProxy(b):
-				return ( a == b ) ? 0 : CINVALID;
-			default:
-			}
-		default:
 		}
 		return (a == b) ? 0 : CINVALID;
 	}
 	
 	public function _string( v : Value ) {
 		return switch( v ) {
-		case VNull: "null";
-		case VInt(i): Std.string(i);
-		case VFloat(f): Std.string(f);
-		case VBool(b): b?"true":"false";
-		case VArray(a):
-			var b = new StringBuf();
-			b.addChar("[".code);
-			var first = true;
-			for( v in a ) {
-				if( first ) first = false else b.addChar(",".code);
-				b.add(_string(v));
-			}
-			b.addChar("]".code);
-			b.toString();
-		case VString(s): s;
-		case VFunction(f): "#function:" + _nargs(f);
-		case VAbstract(_): "#abstract";
-		case VObject(_):
-			throw "TODO";
-		case VProxy(o):
-			Std.string(o);
-		case VProxyFunction(f):
-			Std.string(f);
+			case VNull: "null";
+			case VInt(i): Std.string(i);
+			case VFloat(f): Std.string(f);
+			case VBool(b): b?"true":"false";
+			case VArray(a):
+				var b = new StringBuf();
+				b.addChar("[".code);
+				var first = true;
+				for( v in a ) {
+					if( first ) first = false else b.addChar(",".code);
+					b.add(_string(v));
+				}
+				b.addChar("]".code);
+				b.toString();
+			case VString(s): s;
+			case VFunction(f): "#function:" + _nargs(f);
+			case VAbstract(_): "#abstract";
+			case VObject(_):
+				throw "TODO";
+			case VProxy(o):
+				Std.string(o);
+			case VProxyFunction(f):
+				Std.string(f);
 		}
 	}
 	
@@ -161,9 +162,9 @@ class Builtins {
 		
 	public function typeof( o : Value ) : Value {
 		return VInt(switch( o ) {
-		case VProxy(_): 5; // $tobject
-		case VProxyFunction(_): 7; // $tfunction
-		default: Type.enumIndex(o);
+			case VProxy(_): 5; // $tobject
+			case VProxyFunction(_): 7; // $tfunction
+			default: Type.enumIndex(o);
 		});
 	}
 	
@@ -181,15 +182,15 @@ class Builtins {
 	
 	function objsetproto( o : Value, p : Value ) : Value {
 		switch( o ) {
-		case VObject(o):
-			switch(p) {
-			case VNull: o.proto = null;
-			case VObject(p): o.proto = p;
-			default: return null;
+			case VObject(o):
+				switch(p) {
+				case VNull: o.proto = null;
+				case VObject(p): o.proto = p;
+				default: return null;
+				}
+			default:
+				return null;
 			}
-		default:
-			return null;
-		}
 		return VNull;
 	}
 	

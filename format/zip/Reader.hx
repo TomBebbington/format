@@ -25,7 +25,44 @@
  * DAMAGE.
  */
 package format.zip;
-#if haxe3
+import haxe.io.*;
+#if java
+using sys.io.File;
+using sys.FileSystem;
+import java.util.zip.*;
+import java.io.NativeInput;
+import java.io.NativeOutput;
+abstract Reader(Input) {
+	public inline function new(i:Input)
+		this = i;
+
+	public function read():Data {
+		var b = this.readAll();
+		"temp.zip".saveBytes(b);
+		var zip = try new ZipFile("temp.zip") catch(e:Dynamic) null;
+		if(zip == null)
+			return null;
+		var d:Data = new List();
+		var entries = cast zip.entries();
+		while(entries.hasMoreElements()) {
+			var e = entries.nextElement();
+			var data:Bytes = new NativeInput(zip.getInputStream(e)).readAll();
+			d.add({
+				fileName: e.getName(),
+				fileSize: haxe.Int64.toInt(e.getSize()),
+				fileTime: Date.now(),
+				compressed: false,
+				dataSize: haxe.Int64.toInt(e.getSize()),
+				crc32: haxe.Int64.toInt(e.getCrc()),
+				data: data
+			});
+		}
+		"temp.zip".deleteFile();
+		this.close();
+		return d;
+	}
+}
+#elseif haxe3
 
 typedef Reader = haxe.zip.Reader;
 

@@ -25,7 +25,7 @@ class Tools {
 			default: "Post-J2SE 7";
 		}
 	}
-	public static function resolveConstant<T>(cl:JClass, c:ConstRef<T>):T {
+	public static function resolveConstant(cl:JClass, c:Int):Dynamic {
 		return switch(cl.constants[c]) {
 			case Utf8(s): cast s;
 			case Int(i): cast i;
