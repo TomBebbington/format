@@ -177,7 +177,9 @@ class Reader {
 				case 0x53: Instruction.AAStore;
 				case 0x54: Instruction.BAStore;
 				case 0x55: Instruction.CAStore;
+				case 0x56: Instruction.SAStore;
 				case 0x57: Instruction.Pop;
+				case 0x58: Instruction.Pop2;
 				case 0x59: Instruction.Dup;
 				case 0x5A: Instruction.DupX1;
 				case 0x5B: Instruction.DupX2;
@@ -185,31 +187,59 @@ class Reader {
 				case 0x5D: Instruction.Dup2X1;
 				case 0x5E: Instruction.Dup2X2;
 				case 0x60: Instruction.IAdd;
+				case 0x61: Instruction.LAdd;
 				case 0x62: Instruction.FAdd;
+				case 0x63: Instruction.DAdd;
 				case 0x64: Instruction.DDiv;
+				case 0x65: Instruction.LSub;
 				case 0x66: Instruction.FSub;
+				case 0x67: Instruction.DSub;
 				case 0x68: Instruction.IMul;
+				case 0x69: Instruction.LMul;
 				case 0x6A: Instruction.FMul;
+				case 0x6B: Instruction.DMul;
 				case 0x6C: Instruction.IDiv;
+				case 0x6D: Instruction.LDiv;
 				case 0x6E: Instruction.FDiv;
+				case 0x6F: Instruction.DDiv;
 				case 0x70: Instruction.IRem;
+				case 0x71: Instruction.LRem;
+				case 0x72: Instruction.FRem;
+				case 0x73: Instruction.DRem;
 				case 0x74: Instruction.INeg;
 				case 0x76: Instruction.FNeg;
 				case 0x78: Instruction.IShl;
 				case 0x79: Instruction.LShl;
 				case 0x7A: Instruction.IShr;
 				case 0x7B: Instruction.LShr;
+				case 0x7C: Instruction.IUShr;
+				case 0x7D: Instruction.LUShr;
 				case 0x7E: Instruction.IAnd;
+				case 0x7F: Instruction.LAnd;
 				case 0x80: Instruction.IOr;
+				case 0x81: Instruction.LOr;
+				case 0x82: Instruction.IXor;
+				case 0x83: Instruction.LXor;
 				case 0x84: var ind = i.readByte(); Instruction.IInc(ind, i.readByte());
+				case 0x85: Instruction.I2L;
 				case 0x86: Instruction.I2F;
+				case 0x87: Instruction.I2D;
+				case 0x88: Instruction.L2I;
+				case 0x89: Instruction.L2F;
+				case 0x8A: Instruction.L2D;
 				case 0x8B: Instruction.F2I;
 				case 0x8D: Instruction.F2D;
+				case 0x8E: Instruction.D2I;
+				case 0x8F: Instruction.D2L;
 				case 0x90: Instruction.D2F;
 				case 0x91: Instruction.I2B;
 				case 0x92: Instruction.I2C;
+				case 0x93: Instruction.I2S;
+				case 0x94: Instruction.LCmp;
 				case 0x95: Instruction.FCmpl;
 				case 0x96: Instruction.FCmpg;
+				case 0x97: Instruction.DCmpl;
+				case 0x98: Instruction.DCmpg;
 				case 0x99: Instruction.IfEq(i.readUInt16());
 				case 0x9A: Instruction.IfNeq(i.readUInt16());
 				case 0x9B: Instruction.IfLt(i.readUInt16());
@@ -225,8 +255,22 @@ class Reader {
 				case 0xA5: Instruction.IfACmpEq(i.readUInt16());
 				case 0xA6: Instruction.IfACmpNe(i.readUInt16());
 				case 0xA7: Instruction.Goto(i.readUInt16());
+				case 0xAA:
+					while(i.position % 4 != 0)
+						if(i.readByte() != 0) 
+							throw "Invalid padding";
+					var def = i.readInt32();
+					var low = i.readInt32();
+					var high = i.readInt32();
+					var v = new Map<Int, Int>();
+					for(n in 0...high - low + 1) {
+						v.set(low + n, i.readInt32());
+					}
+					Instruction.TableSwitch(v, def);
 				case 0xAB:
-					while(i.position % 4 != 0) if(i.readByte() != 0) throw "Invalid padding";
+					while(i.position % 4 != 0)
+						if(i.readByte() != 0)
+							throw "Invalid padding";
 					var def = i.readInt32();
 					var npairs = i.readInt32();
 					var map = new Map<Int, Int>();
@@ -237,13 +281,15 @@ class Reader {
 					}
 					Instruction.LookupSwitch(map, def);
 				case 0xAC: Instruction.IReturn;
+				case 0xAD: Instruction.LReturn;
 				case 0xAE: Instruction.FReturn;
+				case 0xAF: Instruction.AReturn;
 				case 0xB0: Instruction.ReturnRef;
 				case 0xB1: Instruction.Return;
-				case 0xB2: Instruction.PutField(i.readUInt16());
+				case 0xB2: Instruction.GetStatic(i.readUInt16());
 				case 0xB3: Instruction.PutStatic(i.readUInt16());
 				case 0xB4: Instruction.GetField(i.readUInt16());
-				case 0xB5: Instruction.GetStatic(i.readUInt16());
+				case 0xB5: Instruction.PutField(i.readUInt16());
 				case 0xB6: Instruction.InvokeVirtual(i.readUInt16());
 				case 0xB7: Instruction.InvokeSpecial(i.readUInt16());
 				case 0xB8: Instruction.InvokeStatic(i.readUInt16());
@@ -259,6 +305,8 @@ class Reader {
 				case 0xBF: Instruction.AThrow;
 				case 0xC0: Instruction.CheckCast(i.readUInt16());
 				case 0xC1: Instruction.InstanceOf(i.readUInt16());
+				case 0xC2: Instruction.MonitorEnter;
+				case 0xC3: Instruction.MonitorExit;
 				case 0xC4: //wide
 					var opcode = i.readByte();
 					switch(opcode) {
@@ -270,7 +318,13 @@ class Reader {
 				case 0xC6: Instruction.IfNull(i.readUInt16());
 				case 0xC7: Instruction.IfNonNull(i.readUInt16());
 				case all: throw 'Unknown Instruction: ${StringTools.hex(all, 2)}';
-			}) catch(e:Eof) {};
+			}) catch(e:Eof) {}
+			catch(d:Dynamic) {
+				var last = a.pop();
+				while(last != null && last == Instruction.NOp)
+					last = a.pop();
+				throw '$d after $last';
+			}
 		return a;
 	}
 	public function read():Data {

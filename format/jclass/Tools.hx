@@ -25,7 +25,7 @@ class Tools {
 			default: "Post-J2SE 7";
 		}
 	}
-	public static function resolveConstant(cl:JClass, c:Int):Dynamic {
+	public static function resolveConstant<T>(cl:JClass, c:ConstRef<T>):T {
 		return switch(cl.constants[c]) {
 			case Utf8(s): cast s;
 			case Int(i): cast i;
@@ -35,18 +35,18 @@ class Tools {
 			case StrRef(i): resolveConstant(cl, i);
 			case ClassRef(i): resolveConstant(cl, i);
 			case MethodRef(cr, ntr):
-				var other = cast(resolveConstant(cl, ntr), String).split(":");
+				var other = resolveConstant(cl, ntr);
 				cast {
 					owner: resolveConstant(cl, cr),
-					name: other[0],
-					type: other[1]
+					name: other.name,
+					type: other.type
 				}
 			case FieldRef(c, nt):
-				var other = cast(resolveConstant(cl, nt), String).split(":");
+				var other:NameAndTypeData = resolveConstant(cl, nt);
 				cast {
 					owner: resolveConstant(cl, c),
-					name: other[0],
-					type: other[1]
+					name: other.name,
+					type: other.type
 				};
 			case NameAndType(n, t):
 				cast {

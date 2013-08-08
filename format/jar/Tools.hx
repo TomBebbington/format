@@ -38,7 +38,7 @@ class Tools {
 				try
 					classes.push(new format.jclass.Reader(new BytesInput(e.data)).read())
 				catch(e:Dynamic)
-					trace('Could not read class $name due to $e');
+					#if debug trace('Could not read class $name due to $e'); #else {} #end
 			}
 		return classes;
 	}
