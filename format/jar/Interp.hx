@@ -5,6 +5,7 @@ using format.jclass.Tools;
 import format.jclass.Data;
 import format.jclass.*;
 import format.jar.Data;
+import format.jclass.JavaType;
 import haxe.io.*;
 class Interp {
 	var classes:Map<String, JClass>;
@@ -36,16 +37,16 @@ class Interp {
 				mainMethod = mt;
 				break;
 			}
-		runMethod(main, mainMethod, [#if sys Sys.args() #else [] #end]);
+		runMethod(main, mainMethod, [#if sys Sys.args() #else [] #end], function(_){});
 	}
-	function runMethod(cl:JClass, m:Method, args:Array<Dynamic>):Void {
+	function runMethod(cl:JClass, m:Method, args:Array<Dynamic>, retf:Dynamic -> Void):Void {
 		for(a in m.attributes)
 			switch(a) {
-				case Code(c): vm(cl, c, args);
+				case Code(c): vm(cl, c, args, retf);
 				default:
 			}
 	}
-	public function vm(cl:JClass, c:Code, lvars:Array<Dynamic>, off:Int = 0):Void {
+	public function vm(cl:JClass, c:Code, lvars:Array<Dynamic>, off:Int = 0, retf:Dynamic -> Void):Void {
 		var stack = new haxe.ds.GenericStack<Dynamic>();
 		if(lvars == null)
 			lvars = [];
@@ -77,18 +78,46 @@ class Interp {
 					if(obj == null)
 						throw 'Cannot access ${s.name} of null';
 					#if debug trace('Calling $obj.${s.name} with $margs'); #end
-					Reflect.callMethod(obj, Reflect.field(obj, s.name), margs);
+					var r = Reflect.callMethod(obj, Reflect.field(obj, s.name), margs);
+					if(ret != null && ret != JavaTypeData.Void)
+						stack.add(r);
+				case InvokeStatic(m):
+					var s = cl.resolveConstant(m);
+					var t = JavaType.parse(s.type);
+					var args = null, ret = null;
+					switch(t) {
+						case Method(_args, _ret):
+							args = _args;
+							ret = _ret;
+						default: throw 'Invalid method $t';
+					}
+					var margs = [for(_ in 0...args.length) stack.pop()];
+					if(classes.exists(s.owner)) {
+						var owner = classes.get(s.owner);
+						var m = owner.findMethod(s.name);
+						runMethod(owner, m, margs, function(v) stack.add(v));
+					} else
+						try {
+							var cls = Type.resolveClass(toHaxeType(s.owner));
+							var r = Reflect.callMethod(cls, Reflect.field(cls, s.name), margs);
+							if(ret != null && ret != JavaTypeData.Void)
+								stack.add(r);
+						} catch(v:Dynamic) {
+							throw 'Could not call method ${s.owner}.${s.name}(${margs.join(", ")}) due to $v';
+						}
 				case IConst(v): stack.add(v);
 				case IStore(i): lvars[i] = stack.pop();
 				case ILoad(i) | ALoad(i): stack.add(lvars[i]);
 				case ArrayLen: stack.add(stack.pop().length);
 				case Return:
-					return;
+					retf(Void);
+				case ReturnRef:
+					retf(stack.pop());
 				case IfICmpGe(b):
 					var val2 = stack.pop();
 					var val1 = stack.pop();
 					if(val1 >= val2)
-						vm(cl, c, lvars, b);
+						vm(cl, c, lvars, b, retf);
 				case FALoad:
 					var ind:Int = stack.pop();
 					var arr:Array<Dynamic> = stack.pop();
@@ -96,11 +125,11 @@ class Interp {
 				case IInc(i, b):
 					lvars[i] += b;
 				case Goto(b):
-					vm(cl, c, lvars, b);
+					vm(cl, c, lvars, b, retf);
 					break;
 				case IfLe(b):
 					if(stack.pop() <= 0) {
-						vm(cl, c, lvars, b);
+						vm(cl, c, lvars, b, retf);
 						break;
 					}
 				default: throw 'Unimplemented: $i';

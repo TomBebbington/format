@@ -56,6 +56,13 @@ class Tools {
 			default: throw 'Constant $c not found';
 		}
 	}
+	public static function findMethod(c:JClass, m:String):Method {
+		for(mt in c.methods) {
+			if(Tools.resolveConstant(c, mt.nameIndex) == m)
+				return mt;
+		}
+		return null;
+	}
 	public static function fieldToString(c:JClass, f:Field) {
 		var access = [for(a in f.accessFlags) a.getName().toLowerCase()+" "].join("");
 		var name:String = resolveConstant(c, f.nameIndex);
