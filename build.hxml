@@ -1,5 +1,6 @@
 -cp tests/jar/
 -main TestClass
 -neko tests/jar/run.n
--cmd neko tests/jar/run.n
--dce full
+-cmd neko tests/jar/run.n "Hallo wrld"
+-dce no
+-lib jax

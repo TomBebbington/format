@@ -8,8 +8,9 @@ class Reader {
 		this.i = i;
 	}
 	function readConstant():Constant {
+		i.bigEndian = true;
 		var bi = i.readByte();
-		return switch(bi) {
+		var c = switch(bi) {
 			case 1: // utf8
 				Constant.Utf8(haxe.Utf8.decode(i.readString(i.readUInt16())));
 			case 3: // 32-bit int
@@ -47,7 +48,9 @@ class Reader {
 				var bootstrap = i.readUInt16();
 				Constant.InvokeDynamic(bootstrap, i.readUInt16());
 			default: throw 'Unknown tag byte ${StringTools.hex(bi)}';
-		}
+		};
+		#if debug trace(c); #end
+		return c;
 	}
 	function readAttribute(pool:Array<Constant>):Attribute {
 		var name = pool[i.readUInt16()];
@@ -335,7 +338,7 @@ class Reader {
 		var minorv = i.readUInt16();
 		d.version = {minor: minorv, major: i.readUInt16()};
 		var constCount = i.readUInt16() - 1;
-		d.constants = [for(i in 0...constCount) readConstant()];
+		d.constants = [for(_ in 0...constCount) readConstant()];
 		d.constants.insert(0, null);
 		var consts:Array<Constant> = d.constants;
 		var accessFlagsi = i.readUInt16();
